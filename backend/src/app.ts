@@ -22,7 +22,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-const nodeEnv = process.env.NODE_ENV || "";
+const nodeEnv = process.env.NODE_ENV || "development";
 
 if (nodeEnv === "development") {
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));

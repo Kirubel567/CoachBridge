@@ -4,14 +4,14 @@ const swaggerOptions = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "Gulit API",
+      title: "CoachBridge API",
       version: "1.0.0",
-      description: "API documentation for the Gulit project",
+      description: "API documentation for the CoachBridge project",
     },
     servers: [
       {
-        url: "http://localhost:3000",
-        description: "Gulit API Server",
+        url: "http://localhost:5000",
+        description: "CoachBridge API Server",
       },
     ],
     components: {
@@ -19,61 +19,29 @@ const swaggerOptions = {
         User: {
           type: "object",
           properties: {
-            id: {
-              type: "string",
-              format: "uuid",
-              example: "123e4567-e89b-12d3-a456-426614174000",
-            },
-            first_name: { type: "string", example: "Alice" },
-            last_name: { type: "string", example: "Smith" },
-            business_name: { type: "string", example: "LTD Trading" },
-            email: {
-              type: "string",
-              format: "email",
-              example: "alice@example.com",
-            },
-            phone_number: { type: "string", example: "+1234567890" },
-            avatar_url: {
-              type: "string",
-              format: "uri",
-              example: "https://example.com/avatar.jpg",
-            },
-            bio: { type: "string", example: "Loves hiking and cooking." },
-            role: { type: "string", example: "buyer" },
-            is_active: { type: "boolean", example: true },
-            email_verified: { type: "boolean", example: true },
-            phone_verified: { type: "boolean", example: true },
-            business_id: { type: "string", example: "BL-12345" },
-            TIN_number: { type: "string", example: "TIN-67890" },
-            business_description: {
-              type: "string",
-              example: "We sell quality products.",
-            },
-            contact_email: {
-              type: "string",
-              format: "email",
-              example: "alice@example.com",
-            },
-            contact_telegram: { type: "string", example: "@alice" },
-            contact_whatsapp: { type: "string", example: "+1234567890" },
-            contact_facebook: { type: "string", example: "alice.fb" },
-            contact_instagram: { type: "string", example: "alice_insta" },
-            contact_website: {
-              type: "string",
-              format: "uri",
-              example: "https://alice.com",
-            },
-            contact_address: { type: "string", example: "123 Forest Lane" },
-            created_at: {
-              type: "string",
-              format: "date-time",
-              example: "2023-07-14T15:20:00Z",
-            },
-            updated_at: {
-              type: "string",
-              format: "date-time",
-              example: "2023-07-15T10:10:00Z",
-            },
+            id: { type: "string", format: "uuid", example: "123e4567-e89b-12d3-a456-426614174000" },
+            fullName: { type: "string", example: "Abel Tesfa" },
+            email: { type: "string", format: "email", example: "abel@example.com" },
+            role: { type: "string", example: "trainer" },
+            createdAt: { type: "string", format: "date-time", example: "2026-02-20T15:12:00Z" },
+            updatedAt: { type: "string", format: "date-time", example: "2026-02-20T15:12:00Z" },
+
+            // Trainer optional fields
+            bio: { type: "string", example: "I love helping clients reach their fitness goals." },
+            yearsOfExperience: { type: "integer", example: 5 },
+            certifications: { type: "array", items: { type: "string" }, example: ["CPT", "Nutrition Specialist"] },
+            specialties: { type: "array", items: { type: "string" }, example: ["Strength Training", "Yoga"] },
+            hourlyRate: { type: "number", example: 50.0 },
+            contactInstagram: { type: "string", example: "@abeltrainer" },
+            contactWebsite: { type: "string", example: "https://abelfitness.com" },
+            contactTelegram: { type: "string", example: "@abel_telegram" },
+
+            // Client optional fields
+            dateOfBirth: { type: "string", format: "date", example: "1995-06-15" },
+            heightCm: { type: "number", example: 175 },
+            weightKg: { type: "number", example: 70 },
+            fitnessGoals: { type: "array", items: { type: "string" }, example: ["Lose weight", "Build muscle"] },
+            membershipActive: { type: "boolean", example: true }
           },
         },
       },

@@ -10,6 +10,7 @@ import {
 import { authenticate } from "../middlewares/auth.middleware";
 
 const router = express.Router();
+
 /**
  * @swagger
  * /api/v1/auth/login:
@@ -29,13 +30,16 @@ const router = express.Router();
  *             properties:
  *               email:
  *                 type: string
- *                 example: jiru@gmail.com
+ *                 example: user@example.com
  *               password:
  *                 type: string
- *                 example: topsecret
+ *                 example: StrongPass123
+ *               rememberMe:
+ *                 type: boolean
+ *                 example: true
  *     responses:
  *       200:
- *         description: User logged in successfully. business_name is null for other roles except enterprise.
+ *         description: User logged in successfully
  *         content:
  *           application/json:
  *             schema:
@@ -52,30 +56,70 @@ const router = express.Router();
  *                   properties:
  *                     id:
  *                       type: string
- *                     first_name:
- *                       type: string
- *                     last_name:
- *                       type: string
- *                     business_name:
+ *                     fullName:
  *                       type: string
  *                     email:
  *                       type: string
- *                     phone_number:
- *                       type: string
  *                     role:
  *                       type: string
- *                     avatar_url:
- *                       type: string
- *                     joined_at:
+ *                     createdAt:
  *                       type: string
  *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *                     bio:
+ *                       type: string
+ *                       nullable: true
+ *                     yearsOfExperience:
+ *                       type: integer
+ *                       nullable: true
+ *                     certifications:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                     specialties:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                     hourlyRate:
+ *                       type: number
+ *                       nullable: true
+ *                     contactInstagram:
+ *                       type: string
+ *                       nullable: true
+ *                     contactWebsite:
+ *                       type: string
+ *                       nullable: true
+ *                     contactTelegram:
+ *                       type: string
+ *                       nullable: true
+ *                     dateOfBirth:
+ *                       type: string
+ *                       format: date-time
+ *                       nullable: true
+ *                     heightCm:
+ *                       type: number
+ *                       nullable: true
+ *                     weightKg:
+ *                       type: number
+ *                       nullable: true
+ *                     fitnessGoals:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                     membershipActive:
+ *                       type: boolean
  *                 token:
  *                   type: object
  *                   properties:
  *                     access_token:
  *                       type: string
+ *                     refresh_token:
+ *                       type: string
  *                     expires_in:
  *                       type: integer
+ *                       example: 86400
  *       400:
  *         description: Invalid email or password
  *         content:
@@ -85,16 +129,19 @@ const router = express.Router();
  *               properties:
  *                 status:
  *                   type: string
+ *                   example: error
  *                 message:
  *                   type: string
+ *                   example: Invalid email or password
  */
-
 router.post("/login", login);
+
+
 /**
  * @swagger
  * /api/v1/auth/signup:
  *   post:
- *     summary: Sign up endpoint. business_name is null for other roles except enterprise.
+ *     summary: Signup endpoint
  *     tags:
  *       - Authentication
  *     requestBody:
@@ -105,33 +152,26 @@ router.post("/login", login);
  *             type: object
  *             required:
  *               - email
- *               - phone_number
  *               - password
+ *               - fullName
+ *               - role
  *             properties:
- *               first_name:
+ *               fullName:
  *                 type: string
- *                 example: Jiru
- *               last_name:
- *                 type: string
- *                 example: Gutema
- *               business_name:
- *                 type: string
- *                 example: LTD Trading
+ *                 example: John Doe
  *               email:
  *                 type: string
- *                 example: jirudagutema@gmail.com
- *               role:
- *                 type: enum [entrepreneur, enterprise, buyer] 
- *                 example: entrepreneur (default 'buyer')
- *               phone_number:
- *                 type: string
- *                 example: +1234567890
+ *                 example: john@example.com
  *               password:
  *                 type: string
- *                 example: StrongPass123!
+ *                 example: StrongPass123
+ *               role:
+ *                 type: string
+ *                 enum: [trainer, trainee, admin]
+ *                 example: trainee
  *     responses:
- *       200:
- *         description: Account created successfully. 
+ *       201:
+ *         description: Account created successfully
  *         content:
  *           application/json:
  *             schema:
@@ -139,27 +179,25 @@ router.post("/login", login);
  *               properties:
  *                 status:
  *                   type: string
+ *                   example: success
  *                 message:
  *                   type: string
+ *                   example: Account created successfully. Please check your email for verification.
  *                 user:
  *                   type: object
  *                   properties:
  *                     id:
  *                       type: string
- *                        
- *                     first_name:
- *                       type: string
- *                     last_name:
- *                       type: string
- *                     business_name:
+ *                     fullName:
  *                       type: string
  *                     email:
  *                       type: string
- *                     phone_number:
- *                       type: string
  *                     role:
  *                       type: string
- *                     joined_at:
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
  *                       type: string
  *                       format: date-time
  *                 token:
@@ -167,10 +205,13 @@ router.post("/login", login);
  *                   properties:
  *                     access_token:
  *                       type: string
+ *                     refresh_token:
+ *                       type: string
  *                     expires_in:
  *                       type: integer
+ *                       example: 3600
  *       400:
- *         description: Email already registered
+ *         description: Email already registered or invalid data
  */
 
 router.post("/signup", signup);
@@ -186,7 +227,7 @@ router.post("/signup", signup);
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Token refreshed
+ *         description: Token refreshed successfully
  *         content:
  *           application/json:
  *             schema:
@@ -194,10 +235,8 @@ router.post("/signup", signup);
  *               properties:
  *                 token:
  *                   type: string
- *                   example: new.jwt.access.token.here
  *                 refresh_token:
  *                   type: string
- *                   example: new.refresh.token.here
  *       401:
  *         description: Unauthorized
  */
@@ -208,20 +247,16 @@ router.get("/refresh", authenticate, refreshToken);
  * @swagger
  * /api/v1/auth/reset-password:
  *   post:
- *     summary: Reset user password
+ *     summary: Reset password
  *     tags:
  *       - Authentication
- *     description: >
- *       Resets the user's password using a token sent to their email.
- *       The token is included in the request query and new password should be included in the request body.
  *     parameters:
  *       - in: query
  *         name: token
- *         description: password-change verification token
- *         required: true
  *         schema:
  *           type: string
- *           example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *         required: true
+ *         description: Password reset token
  *     requestBody:
  *       required: true
  *       content:
@@ -237,17 +272,6 @@ router.get("/refresh", authenticate, refreshToken);
  *     responses:
  *       200:
  *         description: Password reset successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 message:
- *                   type: string
- *                   example: Password reset successfully
  *       400:
  *         description: Token and new password are required
  *       401:
