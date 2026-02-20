@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: coachbridge_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: coachbridge_user
+      POSTGRES_PASSWORD: coachbridge_password
+      POSTGRES_DB: coachbridge_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: coachbridge_backend
+    restart: always
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://coachbridge_user:coachbridge_password@postgres:5432/coachbridge_db
+    volumes:
+      - ./backend:/app
+    command: npm run dev
+
+  ai:
+    build: ./ai
+    container_name: coachbridge_ai
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ai:/app
+
+  frontend:
+    build: ./frontend
+    container_name: coachbridge_frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+
+volumes:
+  postgres_data:
