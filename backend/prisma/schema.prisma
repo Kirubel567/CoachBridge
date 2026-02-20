@@ -18,13 +18,31 @@ model User {
   fullName  String
   email     String   @unique
   password  String
-  userType  UserType
+  role      Role
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // ---- Trainer optional fields ----
+  bio               String?
+  yearsOfExperience Int?
+  certifications    String[]  @default([])
+  specialties       String[]  @default([])
+  hourlyRate        Float?
+
+  contactInstagram  String?
+  contactWebsite    String?
+  contactTelegram   String?
+
+  // ---- Client optional fields ----
+  dateOfBirth      DateTime?
+  heightCm         Float?
+  weightKg         Float?
+  fitnessGoals     String[]  @default([])
+  membershipActive Boolean   @default(false)
 }
 
-enum UserType {
-  TRAINER
-  TRAINEE
-  ADMIN
+enum Role {
+  trainer
+  trainee
+  admin
 }

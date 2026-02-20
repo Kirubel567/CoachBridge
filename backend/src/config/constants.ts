@@ -10,7 +10,7 @@ export const HTTP_STATUS = {
 
 export const USER_ROLES = {
   TRAINER: 'trainer',
-  CLIENT: 'client',
+  TRAINEE: 'trainee',
   ADMIN: 'admin',
 } as const;
 
