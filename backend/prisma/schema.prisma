@@ -1,0 +1,430 @@
+// CoachBridge — Prisma schema.
+// Grows phase by phase. Phase 0: base User. Phase 1: profiles + auth tokens.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  trainee
+  trainer
+  admin
+}
+
+enum VerificationStatus {
+  pending
+  verified
+  rejected
+}
+
+enum AuthTokenType {
+  email_verify
+  password_reset
+}
+
+enum BookingStatus {
+  pending
+  confirmed
+  completed
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
+enum PayoutStatus {
+  requested
+  processing
+  paid
+  failed
+}
+
+enum PlanType {
+  workout
+  nutrition
+}
+
+enum NotificationType {
+  message
+  booking
+  payment
+  review
+  system
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  fullName      String
+  role          Role     @default(trainee)
+  emailVerified Boolean  @default(false)
+  avatarUrl     String?
+  suspended     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  traineeProfile  TraineeProfile?
+  trainerProfile  TrainerProfile?
+  refreshTokens   RefreshToken[]
+  authTokens      AuthToken[]
+  reviewsReceived   Review[]            @relation("TrainerReviews")
+  reviewsWritten    Review[]            @relation("AuthoredReviews")
+  availabilityRules AvailabilityRule[]
+  bookingsAsTrainee Booking[]           @relation("TraineeBookings")
+  bookingsAsTrainer Booking[]           @relation("TrainerBookings")
+  paymentsMade      Payment[]           @relation("TraineePayments")
+  paymentsReceived  Payment[]           @relation("TrainerPayments")
+  payouts           Payout[]
+  plansAuthored     Plan[]              @relation("TrainerPlans")
+  plansAssigned     Plan[]              @relation("TraineePlans")
+  progressEntries   ProgressEntry[]
+  progressPhotos    ProgressPhoto[]
+  conversationsA    Conversation[]      @relation("ConvUserA")
+  conversationsB    Conversation[]      @relation("ConvUserB")
+  messagesSent      Message[]
+  notifications     Notification[]
+  certifications    Certification[]     @relation("TrainerCertifications")
+  auditLogs         AuditLog[]
+
+  @@map("users")
+}
+
+model TraineeProfile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goals                 String[]
+  experienceLevel       String? // beginner | intermediate | advanced
+  heightCm              Int?
+  weightKg              Int?
+  city                  String?
+  preferredSessionTypes String[] // "in-person" | "online"
+  coachingStylePrefs    String[]
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("trainee_profiles")
+}
+
+model TrainerProfile {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio                String?
+  specialties        String[]
+  experienceYears    Int                @default(0)
+  pricePerSession    Int                @default(0) // integer cents of ETB
+  city               String?
+  location           String?
+  sessionTypes       String[] // "in-person" | "online"
+  verificationStatus VerificationStatus @default(pending)
+  // Denormalized for fast discovery sort/filter; kept in sync on review create
+  // (Phase 5) and booking complete (Phase 3).
+  ratingAvg          Float              @default(0)
+  ratingCount        Int                @default(0)
+  sessionsCount      Int                @default(0)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@map("trainer_profiles")
+}
+
+// Opaque rotating refresh tokens (sha256 of the raw token is stored so we can
+// look it up on refresh, then rotate). Access tokens stay stateless JWTs.
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// A trainer's recurring weekly availability. Slots are generated from these
+// rules (fixed 60-min sessions) minus already-booked times.
+model AvailabilityRule {
+  id          String @id @default(cuid())
+  trainerId   String // User.id
+  dayOfWeek   Int // 0=Sun … 6=Sat
+  startMinute Int // minutes from midnight (e.g. 540 = 09:00)
+  endMinute   Int // exclusive upper bound (e.g. 720 = 12:00)
+
+  trainer User @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@index([trainerId])
+  @@map("availability_rules")
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  traineeId   String // User.id
+  trainerId   String // User.id
+  startAt     DateTime
+  endAt       DateTime
+  sessionType String // "in-person" | "online"
+  status      BookingStatus @default(pending)
+  priceCents  Int // captured from the trainer's price at booking time
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  cancelledAt DateTime?
+  completedAt DateTime?
+
+  trainee User     @relation("TraineeBookings", fields: [traineeId], references: [id], onDelete: Cascade)
+  trainer User     @relation("TrainerBookings", fields: [trainerId], references: [id], onDelete: Cascade)
+  payment Payment?
+
+  @@index([traineeId])
+  @@index([trainerId, startAt])
+  @@map("bookings")
+}
+
+// Escrow-lite: trainee is charged on booking (Chapa), platform holds the funds,
+// and on booking completion the trainer's share (minus commission) is released.
+model Payment {
+  id              String        @id @default(cuid())
+  txRef           String        @unique // our reference sent to Chapa
+  bookingId       String?       @unique
+  traineeId       String // payer
+  trainerId       String // beneficiary
+  amountCents     Int // total charged (ETB cents)
+  commissionCents Int // platform cut
+  payoutCents     Int // trainer's share = amount - commission
+  currency        String        @default("ETB")
+  status          PaymentStatus @default(pending)
+  chapaRef        String? // Chapa transaction id (from verify/webhook)
+  checkoutUrl     String?
+  escrowReleased  Boolean       @default(false) // flipped when the booking completes
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  paidAt          DateTime?
+
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  trainee User     @relation("TraineePayments", fields: [traineeId], references: [id], onDelete: Cascade)
+  trainer User     @relation("TrainerPayments", fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@index([trainerId])
+  @@index([traineeId])
+  @@map("payments")
+}
+
+// Trainer withdrawal request to Telebirr/CBE (actual disbursement is manual/out
+// of band for v1).
+model Payout {
+  id          String       @id @default(cuid())
+  trainerId   String
+  amountCents Int
+  method      String // "telebirr" | "cbe"
+  destination String // phone or account number
+  status      PayoutStatus @default(requested)
+  createdAt   DateTime     @default(now())
+  processedAt DateTime?
+
+  trainer User @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@index([trainerId])
+  @@map("payouts")
+}
+
+// Trainer reviews. Creation (gated on a completed booking) and trainer replies
+// land in Phase 5; Phase 2 reads them and keeps the denormalized rating.
+model Review {
+  id        String   @id @default(cuid())
+  trainerId String // User.id of the reviewed trainer
+  authorId  String // User.id of the trainee author
+  rating     Int // 1..5
+  comment    String
+  response   String? // trainer's reply
+  flagged    Boolean @default(false) // screened at creation (anti-disintermediation)
+  flagReason String?
+  hidden     Boolean @default(false) // removed by an admin moderator
+  createdAt  DateTime @default(now())
+
+  trainer User @relation("TrainerReviews", fields: [trainerId], references: [id], onDelete: Cascade)
+  author  User @relation("AuthoredReviews", fields: [authorId], references: [id], onDelete: Cascade)
+
+  // One review per trainee per trainer is enforced in ReviewsService (kept off
+  // the DB so migrations stay purely additive).
+  @@index([trainerId])
+  @@index([authorId])
+  @@map("reviews")
+}
+
+// Workout / nutrition plan a trainer assigns to a trainee. `content` holds the
+// structured program (see src/plans/plan-content.ts).
+model Plan {
+  id          String   @id @default(cuid())
+  trainerId   String // author
+  traineeId   String // assignee
+  type        PlanType
+  title       String
+  summary     String?
+  content     Json
+  templateKey String? // set when instantiated from the template library
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trainer User @relation("TrainerPlans", fields: [trainerId], references: [id], onDelete: Cascade)
+  trainee User @relation("TraineePlans", fields: [traineeId], references: [id], onDelete: Cascade)
+
+  @@index([traineeId])
+  @@index([trainerId])
+  @@map("plans")
+}
+
+// A trainee's progress log entry (body stats + optional completed workout).
+model ProgressEntry {
+  id               String   @id @default(cuid())
+  traineeId        String
+  date             DateTime @default(now())
+  weightKg         Float?
+  bodyFatPct       Float?
+  completedWorkout Boolean  @default(false)
+  note             String?
+  metrics          Json? // e.g. { waistCm, chestCm, benchKg, squatKg }
+  createdAt        DateTime @default(now())
+
+  trainee User @relation(fields: [traineeId], references: [id], onDelete: Cascade)
+
+  @@index([traineeId, date])
+  @@map("progress_entries")
+}
+
+model ProgressPhoto {
+  id        String   @id @default(cuid())
+  traineeId String
+  url       String
+  createdAt DateTime @default(now())
+
+  trainee User @relation(fields: [traineeId], references: [id], onDelete: Cascade)
+
+  @@index([traineeId])
+  @@map("progress_photos")
+}
+
+// A 1:1 conversation between two users. Participant ids are stored normalized
+// (userAId < userBId) so each pair has exactly one conversation.
+model Conversation {
+  id            String    @id @default(cuid())
+  userAId       String
+  userBId       String
+  lastMessageAt DateTime?
+  createdAt     DateTime  @default(now())
+
+  userA    User      @relation("ConvUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB    User      @relation("ConvUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([userAId, userBId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String    @id @default(cuid())
+  conversationId String
+  senderId       String
+  body           String
+  flagged        Boolean   @default(false) // anti-disintermediation match
+  flagReason     String?
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+// Trainer certification / gov-ID submission reviewed by an admin. Approval sets
+// the trainer profile's verificationStatus ("Verified" badge).
+model Certification {
+  id              String             @id @default(cuid())
+  trainerId       String
+  title           String
+  issuer          String?
+  documentUrl     String
+  govIdUrl        String?
+  status          VerificationStatus @default(pending)
+  rejectionReason String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  trainer User @relation("TrainerCertifications", fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@index([trainerId])
+  @@index([status])
+  @@map("certifications")
+}
+
+// Caches responses for POSTs that carry an Idempotency-Key (payments, bookings)
+// so a retried request returns the original result instead of acting twice.
+model IdempotencyKey {
+  id         String   @id // `${userId}:${key}`
+  statusCode Int      @default(201)
+  response   Json
+  createdAt  DateTime @default(now())
+
+  @@map("idempotency_keys")
+}
+
+// Append-only audit trail for sensitive actions (SRS 3.3.7).
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  targetType String?
+  targetId   String?
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// Single-use tokens for email verification and password reset.
+model AuthToken {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      AuthTokenType
+  tokenHash String        @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([userId, type])
+  @@map("auth_tokens")
+}
