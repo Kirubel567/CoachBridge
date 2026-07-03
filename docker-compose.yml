@@ -1,0 +1,27 @@
+# CoachBridge — local development services.
+# Start with:  docker compose up -d
+# The backend reads DATABASE_URL from backend/.env (matches the creds below).
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: coachbridge-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: coachbridge
+      POSTGRES_PASSWORD: coachbridge
+      POSTGRES_DB: coachbridge
+    # Host port 55432 to avoid clashing with a native Postgres cluster that
+    # already occupies 5432-5433 on this machine.
+    ports:
+      - "55432:5432"
+    volumes:
+      - coachbridge_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coachbridge -d coachbridge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  coachbridge_pgdata:
