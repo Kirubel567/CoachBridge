@@ -27,6 +27,24 @@ export default function BrowseTrainersPage() {
     return () => clearTimeout(t);
   }, [q]);
 
+  // Seed filters from the URL when arriving from the landing-page search.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const qp = sp.get("q");
+    if (qp) {
+      setQ(qp);
+      setDebouncedQ(qp);
+    }
+    const spec = sp.get("specialty");
+    if (spec && specialtyFilters.includes(spec)) setSpecialty(spec);
+    const st = sp.get("sessionType");
+    if (st === "in-person" || st === "online") setSessionType(st);
+    const sortp = sp.get("sort");
+    if (sortp) setSort(sortp as TrainerQuery["sort"]);
+    // Runs once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const query = useMemo<TrainerQuery>(
     () => ({
       q: debouncedQ || undefined,
