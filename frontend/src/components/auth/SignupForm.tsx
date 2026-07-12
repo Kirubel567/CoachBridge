@@ -19,18 +19,23 @@ export function SignupForm() {
 
   const [role, setRole] = useState<Role>(initialRole);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const name = String(form.get("name") ?? "");
     const email = String(form.get("email") ?? "");
+    const password = String(form.get("password") ?? "");
     setSubmitting(true);
-    // Mock — replaced by POST /auth/register. Then straight into onboarding.
-    setTimeout(() => {
-      signup({ name, email, role });
+    setError(null);
+    try {
+      await signup({ name, email, password, role });
       router.push("/onboarding");
-    }, 700);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create account.");
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -91,6 +96,12 @@ export function SignupForm() {
             placeholder="••••••••"
           />
         </Field>
+
+        {error && (
+          <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-400">
+            {error}
+          </p>
+        )}
 
         <Button type="submit" fullWidth disabled={submitting}>
           {submitting

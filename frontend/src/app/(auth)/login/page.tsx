@@ -15,17 +15,23 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [role, setRole] = useState<Role>("trainee");
+  const [error, setError] = useState<string | null>(null);
 
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const email = String(form.get("email") ?? "");
+    const password = String(form.get("password") ?? "");
     setSubmitting(true);
-    // Mock — replaced by POST /auth/login (which returns the real role).
-    setTimeout(() => {
-      login({ email, role });
-      router.push(homeForRole(role));
-    }, 600);
+    setError(null);
+    try {
+      // Real backend returns the true role; `mockRole` is only used offline.
+      const session = await login({ email, password, mockRole: role });
+      router.push(homeForRole(session.role));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not log in.");
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -71,6 +77,12 @@ export default function LoginPage() {
             placeholder="••••••••"
           />
         </Field>
+
+        {error && (
+          <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-400">
+            {error}
+          </p>
+        )}
 
         <div className="flex justify-end">
           <Link
