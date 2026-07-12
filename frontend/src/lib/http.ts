@@ -4,10 +4,15 @@
 // here; otherwise it resolves from the local mock database. This is the single
 // switch that turns the frontend "live" — no calling code changes.
 
-const BASE = process.env.NEXT_PUBLIC_API_URL;
+/** Backend base URL, e.g. http://localhost:4000/api/v1 (see .env.example). */
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-/** True when a backend URL is configured — see .env.example. */
-export const USE_REAL_API = Boolean(BASE);
+/**
+ * Whether the typed data endpoints (trainers, bookings…) hit the real backend.
+ * Kept as an explicit flag — separate from auth — so the live API can be enabled
+ * for auth first, then for data once backend shapes are adapted to these types.
+ */
+export const USE_REAL_API = process.env.NEXT_PUBLIC_USE_REAL_API === "true";
 
 export class ApiError extends Error {
   code: string;
@@ -36,7 +41,7 @@ export async function http<T>(
   path: string,
   opts: RequestInit = {}
 ): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     ...opts,
     headers: {
       "Content-Type": "application/json",
